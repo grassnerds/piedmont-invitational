@@ -993,7 +993,7 @@
                             </select>
                         </div>
                         <div style="display: flex; gap: 8px; align-items: flex-end;">
-                            <button style="flex: 1;">Add Player</button>
+                            <button id="addPlayerBtn" style="flex: 1;">Add Player</button>
                         </div>
                     </div>
                     <div id="playersList"></div>
@@ -2049,7 +2049,7 @@
             renderScorecard();
         });
 
-        document.querySelector('[data-tab="setup"] .form-group:nth-of-type(1) button').addEventListener('click', () => {
+        document.getElementById('addPlayerBtn').addEventListener('click', () => {
             const name = document.getElementById('playerName').value;
             const handicap = document.getElementById('playerHandicap').value;
             const teamId = document.getElementById('playerTeam').value;
