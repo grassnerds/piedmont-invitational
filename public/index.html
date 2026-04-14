@@ -1,0 +1,2157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Piedmont Invitational</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-green: #14532d;
+            --secondary-green: #166534;
+            --accent-gold: #d4a843;
+            --text-light: #f5f5f5;
+            --text-dark: #1a1a1a;
+            --border-color: #2a2a2a;
+            --hover-bg: #1f4d3d;
+        }
+
+        body {
+            font-family: Georgia, serif;
+            background-color: var(--primary-green);
+            color: var(--text-light);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-green) 0%, var(--secondary-green) 100%);
+            padding: 16px;
+            border-bottom: 2px solid var(--accent-gold);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title {
+            flex: 1;
+        }
+
+        h1 {
+            font-size: 32px;
+            color: var(--accent-gold);
+            margin-bottom: 4px;
+            font-weight: bold;
+        }
+
+        .header-subtitle {
+            font-size: 14px;
+            color: var(--text-light);
+            opacity: 0.8;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #10b981;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.offline {
+            background-color: #ef4444;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .live-badge {
+            background-color: #dc2626;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: white;
+            animation: pulse-red 1s infinite;
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        main {
+            flex: 1;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tabs {
+            display: flex;
+            background-color: var(--secondary-green);
+            border-bottom: 1px solid var(--border-color);
+            overflow-x: auto;
+            gap: 0;
+        }
+
+        .tab-button {
+            flex: 1;
+            min-width: 100px;
+            padding: 12px 16px;
+            background: none;
+            border: none;
+            color: var(--text-light);
+            cursor: pointer;
+            font-family: Georgia, serif;
+            font-size: 14px;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .tab-button:hover {
+            background-color: var(--hover-bg);
+        }
+
+        .tab-button.active {
+            color: var(--accent-gold);
+            border-bottom-color: var(--accent-gold);
+        }
+
+        .tab-content {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .section {
+            background-color: var(--secondary-green);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border-color);
+        }
+
+        h2 {
+            color: var(--accent-gold);
+            margin-bottom: 16px;
+            font-size: 24px;
+            border-bottom: 2px solid var(--accent-gold);
+            padding-bottom: 8px;
+        }
+
+        h3 {
+            color: var(--text-light);
+            margin-bottom: 12px;
+            font-size: 18px;
+        }
+
+        .round-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            overflow-x: auto;
+            flex-wrap: wrap;
+        }
+
+        .round-tab {
+            padding: 8px 16px;
+            background-color: var(--primary-green);
+            border: 1px solid var(--border-color);
+            color: var(--text-light);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .round-tab.active {
+            background-color: var(--accent-gold);
+            color: var(--text-dark);
+            border-color: var(--accent-gold);
+        }
+
+        .round-tab:hover {
+            background-color: var(--hover-bg);
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+        }
+
+        .leaderboard-table thead {
+            background-color: var(--primary-green);
+        }
+
+        .leaderboard-table th {
+            padding: 12px;
+            text-align: left;
+            color: var(--accent-gold);
+            font-weight: bold;
+            border-bottom: 2px solid var(--accent-gold);
+        }
+
+        .leaderboard-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .leaderboard-table tbody tr:hover {
+            background-color: var(--hover-bg);
+        }
+
+        .player-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .position {
+            color: var(--accent-gold);
+            font-weight: bold;
+            min-width: 30px;
+        }
+
+        .player-name {
+            flex: 1;
+        }
+
+        .team-badge {
+            background-color: var(--primary-green);
+            color: var(--accent-gold);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+
+        .score-badge {
+            background-color: var(--primary-green);
+            color: var(--text-light);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .score-badge.positive {
+            color: #ef4444;
+        }
+
+        .score-badge.negative {
+            color: #10b981;
+        }
+
+        .thru-indicator {
+            color: var(--text-light);
+            opacity: 0.7;
+            font-size: 12px;
+        }
+
+        .scorecard-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .player-selector, .round-selector {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        select, input {
+            padding: 8px;
+            background-color: var(--primary-green);
+            color: var(--text-light);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: Georgia, serif;
+            font-size: 14px;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 0 2px rgba(212, 168, 67, 0.2);
+        }
+
+        .nine-holes {
+            margin-bottom: 16px;
+        }
+
+        .nine-holes h4 {
+            color: var(--accent-gold);
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+
+        .hole-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+            gap: 8px;
+        }
+
+        .hole-item {
+            background-color: var(--primary-green);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 8px;
+            text-align: center;
+        }
+
+        .hole-label {
+            font-size: 11px;
+            color: var(--text-light);
+            opacity: 0.7;
+            margin-bottom: 4px;
+        }
+
+        .hole-par {
+            font-size: 12px;
+            color: var(--accent-gold);
+            margin-bottom: 4px;
+        }
+
+        .hole-input {
+            width: 100%;
+            padding: 4px;
+            background-color: var(--secondary-green);
+            color: var(--text-light);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .hole-input.eagle {
+            background-color: goldenrod;
+            color: var(--text-dark);
+        }
+
+        .hole-input.birdie {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        .hole-input.par {
+            background-color: #666;
+            color: white;
+        }
+
+        .hole-input.bogey {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .hole-input.double-plus {
+            background-color: #8b5cf6;
+            color: white;
+        }
+
+        .hole-input.worse {
+            background-color: #1f2937;
+            color: white;
+        }
+
+        .score-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .info-box {
+            background-color: var(--primary-green);
+            padding: 12px;
+            border-radius: 4px;
+            border-left: 3px solid var(--accent-gold);
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: var(--text-light);
+            opacity: 0.7;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 18px;
+            color: var(--accent-gold);
+            font-weight: bold;
+        }
+
+        .skins-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .skin-hole {
+            background-color: var(--primary-green);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .skin-hole-number {
+            color: var(--accent-gold);
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .skin-winner {
+            color: var(--text-light);
+            font-size: 13px;
+        }
+
+        .skin-winner.push {
+            color: #fbbf24;
+        }
+
+        .skin-winner.carry {
+            color: #a78bfa;
+        }
+
+        .teams-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .team-card {
+            background-color: var(--primary-green);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .team-name {
+            color: var(--accent-gold);
+            font-size: 18px;
+            margin-bottom: 12px;
+            font-weight: bold;
+        }
+
+        .team-score {
+            color: var(--text-light);
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .team-members {
+            border-top: 1px solid var(--border-color);
+            padding-top: 12px;
+            margin-top: 12px;
+        }
+
+        .member-item {
+            color: var(--text-light);
+            font-size: 13px;
+            padding: 4px 0;
+        }
+
+        .course-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .course-card {
+            background-color: var(--primary-green);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .course-header {
+            border-bottom: 2px solid var(--accent-gold);
+            padding-bottom: 12px;
+            margin-bottom: 12px;
+        }
+
+        .course-name {
+            color: var(--accent-gold);
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .course-location {
+            color: var(--text-light);
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .course-specs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+            font-size: 12px;
+        }
+
+        .spec-item {
+            background-color: var(--secondary-green);
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .spec-label {
+            color: var(--text-light);
+            opacity: 0.7;
+            margin-bottom: 2px;
+        }
+
+        .spec-value {
+            color: var(--accent-gold);
+            font-weight: bold;
+        }
+
+        .tee-box {
+            margin-bottom: 16px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 12px;
+        }
+
+        .tee-name {
+            color: var(--accent-gold);
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .tee-specs {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            font-size: 11px;
+            margin-bottom: 12px;
+        }
+
+        .tee-spec {
+            background-color: var(--primary-green);
+            padding: 6px;
+            border-radius: 3px;
+        }
+
+        .tee-spec label {
+            display: block;
+            color: var(--text-light);
+            opacity: 0.7;
+            margin-bottom: 2px;
+        }
+
+        .tee-spec span {
+            display: block;
+            color: var(--accent-gold);
+            font-weight: bold;
+        }
+
+        .holes-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            margin-bottom: 12px;
+        }
+
+        .holes-table thead {
+            background-color: var(--secondary-green);
+        }
+
+        .holes-table th {
+            padding: 4px;
+            text-align: center;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--accent-gold);
+            font-weight: bold;
+        }
+
+        .holes-table td {
+            padding: 4px;
+            text-align: center;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-light);
+        }
+
+        .setup-section {
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .form-group.full {
+            grid-template-columns: 1fr;
+        }
+
+        .form-group label {
+            display: block;
+            color: var(--accent-gold);
+            font-size: 12px;
+            margin-bottom: 4px;
+            font-weight: bold;
+        }
+
+        button {
+            padding: 10px 16px;
+            background-color: var(--accent-gold);
+            color: var(--text-dark);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: Georgia, serif;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #e8c965;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background-color: var(--primary-green);
+            color: var(--accent-gold);
+            border: 2px solid var(--accent-gold);
+        }
+
+        button.secondary:hover {
+            background-color: var(--hover-bg);
+        }
+
+        button.danger {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        button.danger:hover {
+            background-color: #dc2626;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .error-message {
+            background-color: #7f1d1d;
+            border: 1px solid #ef4444;
+            color: #fca5a5;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+        }
+
+        .success-message {
+            background-color: #064e3b;
+            border: 1px solid #10b981;
+            color: #a7f3d0;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 32px 16px;
+            color: var(--text-light);
+            opacity: 0.6;
+        }
+
+        .toggle-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .toggle-btn {
+            flex: 1;
+            padding: 8px;
+            background-color: var(--primary-green);
+            color: var(--text-light);
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: Georgia, serif;
+            font-size: 13px;
+        }
+
+        .toggle-btn.active {
+            background-color: var(--accent-gold);
+            color: var(--text-dark);
+            border-color: var(--accent-gold);
+        }
+
+        .player-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: var(--primary-green);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+
+        .player-info {
+            flex: 1;
+        }
+
+        .player-item-name {
+            color: var(--text-light);
+            font-weight: bold;
+        }
+
+        .player-item-hcp {
+            color: var(--text-light);
+            opacity: 0.7;
+            font-size: 12px;
+        }
+
+        .round-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: var(--primary-green);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+
+        .round-info {
+            flex: 1;
+        }
+
+        .round-item-name {
+            color: var(--text-light);
+            font-weight: bold;
+        }
+
+        .round-item-course {
+            color: var(--text-light);
+            opacity: 0.7;
+            font-size: 12px;
+        }
+
+        .share-section {
+            background-color: var(--primary-green);
+            padding: 16px;
+            border-radius: 4px;
+            border-left: 3px solid var(--accent-gold);
+            margin-top: 24px;
+        }
+
+        .share-url {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .share-url input {
+            flex: 1;
+        }
+
+        .share-url button {
+            white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 24px;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 12px;
+                align-items: flex-start;
+            }
+
+            .tabs {
+                overflow-x: scroll;
+            }
+
+            .tab-button {
+                min-width: 80px;
+                padding: 10px 12px;
+                font-size: 12px;
+            }
+
+            .scorecard-container {
+                grid-template-columns: 1fr;
+            }
+
+            .leaderboard-table th,
+            .leaderboard-table td {
+                padding: 8px;
+                font-size: 13px;
+            }
+
+            .teams-grid,
+            .course-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .hole-grid {
+                grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+            }
+
+            .form-group {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="header-title">
+                <h1>The Piedmont Invitational</h1>
+                <div class="header-subtitle">Upstate South Carolina</div>
+            </div>
+            <div class="connection-status">
+                <div class="live-badge" id="liveBadge">
+                    <div class="live-dot"></div>
+                    LIVE
+                </div>
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Connected</span>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="tabs">
+            <button class="tab-button active" data-tab="leaderboard">Leaderboard</button>
+            <button class="tab-button" data-tab="scorecard">Scorecard</button>
+            <button class="tab-button" data-tab="skins">Skins</button>
+            <button class="tab-button" data-tab="teams">Teams</button>
+            <button class="tab-button" data-tab="courses">Courses</button>
+            <button class="tab-button" data-tab="setup">Setup</button>
+        </div>
+
+        <!-- LEADERBOARD TAB -->
+        <div id="leaderboard" class="tab-content active">
+            <div class="section">
+                <h2>Live Leaderboard</h2>
+                <div class="toggle-group">
+                    <button class="toggle-btn active" data-scoring="net">Net Score</button>
+                    <button class="toggle-btn" data-scoring="gross">Gross Score</button>
+                </div>
+                <div class="round-tabs" id="leaderboardRoundTabs"></div>
+                <div id="leaderboardContent"></div>
+            </div>
+        </div>
+
+        <!-- SCORECARD TAB -->
+        <div id="scorecard" class="tab-content">
+            <div class="section">
+                <h2>Scorecard</h2>
+                <div class="player-selector">
+                    <label>Select Player:</label>
+                    <select id="scorecardPlayer">
+                        <option value="">-- Select Player --</option>
+                    </select>
+                </div>
+                <div class="player-selector">
+                    <label>Select Round:</label>
+                    <select id="scorecardRound">
+                        <option value="">-- Select Round --</option>
+                    </select>
+                </div>
+                <div class="score-info">
+                    <div class="info-box">
+                        <div class="info-label">Course Handicap</div>
+                        <div class="info-value" id="courseHcpDisplay">-</div>
+                    </div>
+                    <div class="info-box">
+                        <div class="info-label">Strokes Received</div>
+                        <div class="info-value" id="strokesReceivedDisplay">-</div>
+                    </div>
+                </div>
+                <div id="scorecardContent"></div>
+            </div>
+        </div>
+
+        <!-- SKINS TAB -->
+        <div id="skins" class="tab-content">
+            <div class="section">
+                <h2>Skins Game</h2>
+                <div class="toggle-group">
+                    <button class="toggle-btn active" data-skins-scoring="net">Net Skins</button>
+                    <button class="toggle-btn" data-skins-scoring="gross">Gross Skins</button>
+                </div>
+                <div class="round-tabs" id="skinsRoundTabs"></div>
+                <div id="skinsContent"></div>
+            </div>
+        </div>
+
+        <!-- TEAMS TAB -->
+        <div id="teams" class="tab-content">
+            <div class="section">
+                <h2>Teams</h2>
+                <div id="teamsContent"></div>
+            </div>
+        </div>
+
+        <!-- COURSES TAB -->
+        <div id="courses" class="tab-content">
+            <div class="section">
+                <h2>Courses</h2>
+                <div id="coursesContent"></div>
+            </div>
+        </div>
+
+        <!-- SETUP TAB -->
+        <div id="setup" class="tab-content">
+            <div class="section">
+                <h2>Setup</h2>
+
+                <div class="setup-section">
+                    <h3>Players</h3>
+                    <div class="form-group">
+                        <div>
+                            <label>Player Name</label>
+                            <input type="text" id="playerName" placeholder="John Doe">
+                        </div>
+                        <div>
+                            <label>Handicap</label>
+                            <input type="number" id="playerHandicap" placeholder="10" min="0" max="36">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div>
+                            <label>Team (Optional)</label>
+                            <select id="playerTeam">
+                                <option value="">-- No Team --</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: flex-end;">
+                            <button style="flex: 1;">Add Player</button>
+                        </div>
+                    </div>
+                    <div id="playersList"></div>
+                </div>
+
+                <div class="setup-section">
+                    <h3>Teams</h3>
+                    <div class="form-group">
+                        <div>
+                            <label>Team Name</label>
+                            <input type="text" id="teamName" placeholder="Team Alpha">
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: flex-end;">
+                            <button style="flex: 1;" id="addTeamBtn">Add Team</button>
+                        </div>
+                    </div>
+                    <div id="teamsList"></div>
+                </div>
+
+                <div class="setup-section">
+                    <h3>Rounds</h3>
+                    <div class="form-group">
+                        <div>
+                            <label>Round Name</label>
+                            <input type="text" id="roundName" placeholder="Round 1">
+                        </div>
+                        <div>
+                            <label>Course</label>
+                            <select id="roundCourse">
+                                <option value="">-- Select Course --</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div>
+                            <label>Tee Box</label>
+                            <select id="roundTee">
+                                <option value="">-- Select Tee --</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: flex-end;">
+                            <button style="flex: 1;" id="addRoundBtn">Add Round</button>
+                        </div>
+                    </div>
+                    <div id="roundsList"></div>
+                </div>
+
+                <div class="share-section">
+                    <h3>Share Scorecard</h3>
+                    <p style="font-size: 13px; margin-bottom: 12px; opacity: 0.8;">Send this link to share the live leaderboard with others:</p>
+                    <div class="share-url">
+                        <input type="text" id="shareUrl" readonly>
+                        <button id="copyShareBtn">Copy</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ============================================================================
+        // INITIALIZATION & CONFIG
+        // ============================================================================
+
+        const SUPABASE_URL = 'https://gorjeielxonbntajkgtc.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_iWgqoGCfIQe3eQwXB0DEjw_SHhf8dNh';
+
+        const { createClient } = supabase;
+        const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Course data
+        const COURSES_DATA = {
+            1: {
+                name: 'Southern Oaks Golf Club',
+                location: 'Easley, SC',
+                par: 72,
+                tees: {
+                    'Gold': { yards: 6335, rating: 71.2, slope: 132 },
+                    'Blue': { yards: 5995, rating: 69.8, slope: 130 },
+                    'White': { yards: 5657, rating: 68.3, slope: 123 },
+                    'Yellow': { yards: 5034, rating: 66.0, slope: 113 },
+                    'Red': { yards: 4642, rating: 64.3, slope: 109 }
+                },
+                holes: [
+                    { number: 1, par: 4, yards: 382, hcp: 7 },
+                    { number: 2, par: 4, yards: 346, hcp: 15 },
+                    { number: 3, par: 4, yards: 373, hcp: 3 },
+                    { number: 4, par: 3, yards: 155, hcp: 9 },
+                    { number: 5, par: 5, yards: 504, hcp: 13 },
+                    { number: 6, par: 3, yards: 205, hcp: 11 },
+                    { number: 7, par: 5, yards: 580, hcp: 1 },
+                    { number: 8, par: 4, yards: 313, hcp: 17 },
+                    { number: 9, par: 4, yards: 391, hcp: 5 },
+                    { number: 10, par: 4, yards: 431, hcp: 2 },
+                    { number: 11, par: 3, yards: 191, hcp: 10 },
+                    { number: 12, par: 4, yards: 344, hcp: 18 },
+                    { number: 13, par: 3, yards: 149, hcp: 12 },
+                    { number: 14, par: 4, yards: 280, hcp: 16 },
+                    { number: 15, par: 5, yards: 493, hcp: 14 },
+                    { number: 16, par: 4, yards: 354, hcp: 4 },
+                    { number: 17, par: 4, yards: 353, hcp: 6 },
+                    { number: 18, par: 5, yards: 491, hcp: 8 }
+                ]
+            },
+            2: {
+                name: 'Saluda Valley CC',
+                location: 'Williamston, SC',
+                par: 72,
+                tees: {
+                    'Back': { yards: 6336, rating: 71.1, slope: 125 },
+                    'Middle': { yards: 5841, rating: 68.9, slope: 119 },
+                    'Forward': { yards: 5510, rating: 67.2, slope: 115 },
+                    'Red': { yards: 5053, rating: 65.1, slope: 111 }
+                },
+                holes: [
+                    { number: 1, par: 4, yards: 397, hcp: 9 },
+                    { number: 2, par: 3, yards: 171, hcp: 15 },
+                    { number: 3, par: 5, yards: 451, hcp: 11 },
+                    { number: 4, par: 3, yards: 169, hcp: 17 },
+                    { number: 5, par: 4, yards: 400, hcp: 3 },
+                    { number: 6, par: 4, yards: 411, hcp: 5 },
+                    { number: 7, par: 5, yards: 467, hcp: 13 },
+                    { number: 8, par: 4, yards: 405, hcp: 7 },
+                    { number: 9, par: 4, yards: 399, hcp: 1 },
+                    { number: 10, par: 4, yards: 375, hcp: 4 },
+                    { number: 11, par: 5, yards: 474, hcp: 12 },
+                    { number: 12, par: 3, yards: 167, hcp: 10 },
+                    { number: 13, par: 4, yards: 315, hcp: 16 },
+                    { number: 14, par: 4, yards: 297, hcp: 18 },
+                    { number: 15, par: 4, yards: 430, hcp: 2 },
+                    { number: 16, par: 4, yards: 342, hcp: 8 },
+                    { number: 17, par: 3, yards: 189, hcp: 6 },
+                    { number: 18, par: 5, yards: 477, hcp: 14 }
+                ]
+            },
+            3: {
+                name: 'Lakeview Golf Club',
+                location: 'Piedmont, SC',
+                par: 72,
+                tees: {
+                    'Blue': { yards: 6470, rating: 70.0, slope: 110 },
+                    'White': { yards: 6010, rating: 70.0, slope: 110 }
+                },
+                holes: [
+                    { number: 1, par: 4, yards: 350, hcp: 1 },
+                    { number: 2, par: 4, yards: 375, hcp: 3 },
+                    { number: 3, par: 5, yards: 500, hcp: 5 },
+                    { number: 4, par: 4, yards: 445, hcp: 7 },
+                    { number: 5, par: 3, yards: 150, hcp: 17 },
+                    { number: 6, par: 4, yards: 350, hcp: 9 },
+                    { number: 7, par: 3, yards: 165, hcp: 15 },
+                    { number: 8, par: 4, yards: 450, hcp: 11 },
+                    { number: 9, par: 5, yards: 550, hcp: 13 },
+                    { number: 10, par: 4, yards: 385, hcp: 2 },
+                    { number: 11, par: 5, yards: 470, hcp: 10 },
+                    { number: 12, par: 3, yards: 170, hcp: 18 },
+                    { number: 13, par: 4, yards: 385, hcp: 4 },
+                    { number: 14, par: 3, yards: 155, hcp: 16 },
+                    { number: 15, par: 4, yards: 320, hcp: 14 },
+                    { number: 16, par: 4, yards: 425, hcp: 6 },
+                    { number: 17, par: 4, yards: 335, hcp: 8 },
+                    { number: 18, par: 5, yards: 490, hcp: 12 }
+                ]
+            }
+        };
+
+        // State
+        let appState = {
+            players: [],
+            teams: [],
+            rounds: [],
+            scores: [],
+            currentTab: 'leaderboard',
+            leaderboardScoring: 'net',
+            leaderboardRound: 'overall',
+            skinsScoring: 'net',
+            skinsRound: null,
+            selectedPlayer: null,
+            selectedRound: null
+        };
+
+        // ============================================================================
+        // UTILITY FUNCTIONS
+        // ============================================================================
+
+        function calculateCourseHandicap(playerHandicap, courseSlope, courseRating, par) {
+            return Math.round(playerHandicap * (courseSlope / 113) + (courseRating - par));
+        }
+
+        function calculateStrokesDistribution(courseHcp) {
+            const baseStrokes = Math.floor(courseHcp / 18);
+            const extraHoles = courseHcp % 18;
+            return { baseStrokes, extraHoles };
+        }
+
+        function getStrokesReceivedOnHole(holeHcp, courseHcp) {
+            const { baseStrokes, extraHoles } = calculateStrokesDistribution(courseHcp);
+            if (holeHcp <= extraHoles) {
+                return baseStrokes + 1;
+            }
+            return baseStrokes;
+        }
+
+        function getScoreClass(grossScore, par, netScore) {
+            if (grossScore === undefined || grossScore === null) return '';
+            if (grossScore <= par - 2) return 'eagle';
+            if (grossScore === par - 1) return 'birdie';
+            if (grossScore === par) return 'par';
+            if (grossScore === par + 1) return 'bogey';
+            if (grossScore === par + 2) return 'double-plus';
+            return 'worse';
+        }
+
+        function getToPar(totalGross, totalPar) {
+            const diff = totalGross - totalPar;
+            if (diff > 0) return `+${diff}`;
+            if (diff < 0) return `${diff}`;
+            return 'E';
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            if (connected) {
+                statusDot.classList.remove('offline');
+                statusText.textContent = 'Connected';
+            } else {
+                statusDot.classList.add('offline');
+                statusText.textContent = 'Offline';
+            }
+        }
+
+        // ============================================================================
+        // DATA FETCHING
+        // ============================================================================
+
+        async function loadAllData() {
+            try {
+                updateConnectionStatus(true);
+
+                const [playersRes, teamsRes, roundsRes, scoresRes] = await Promise.all([
+                    db.from('golf_players').select('*'),
+                    db.from('golf_teams').select('*'),
+                    db.from('golf_rounds').select('*'),
+                    db.from('golf_scores').select('*')
+                ]);
+
+                if (playersRes.error) throw playersRes.error;
+                if (teamsRes.error) throw teamsRes.error;
+                if (roundsRes.error) throw roundsRes.error;
+                if (scoresRes.error) throw scoresRes.error;
+
+                appState.players = playersRes.data || [];
+                appState.teams = teamsRes.data || [];
+                appState.rounds = roundsRes.data || [];
+                appState.scores = scoresRes.data || [];
+
+                renderAll();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                updateConnectionStatus(false);
+            }
+        }
+
+        // ============================================================================
+        // CRUD OPERATIONS
+        // ============================================================================
+
+        async function addPlayer(name, handicap, teamId) {
+            try {
+                const res = await db.from('golf_players').insert([
+                    { name, handicap: parseInt(handicap), team_id: teamId || null }
+                ]).select();
+
+                if (res.error) throw res.error;
+                appState.players = [...appState.players, ...res.data];
+                renderAll();
+                return true;
+            } catch (error) {
+                console.error('Error adding player:', error);
+                return false;
+            }
+        }
+
+        async function deletePlayer(playerId) {
+            try {
+                const res = await db.from('golf_players').delete().eq('id', playerId);
+                if (res.error) throw res.error;
+                appState.players = appState.players.filter(p => p.id !== playerId);
+                renderAll();
+                return true;
+            } catch (error) {
+                console.error('Error deleting player:', error);
+                return false;
+            }
+        }
+
+        async function addTeam(name) {
+            try {
+                const res = await db.from('golf_teams').insert([{ name }]).select();
+                if (res.error) throw res.error;
+                appState.teams = [...appState.teams, ...res.data];
+                renderAll();
+                return true;
+            } catch (error) {
+                console.error('Error adding team:', error);
+                return false;
+            }
+        }
+
+        async function deleteTeam(teamId) {
+            try {
+                const res = await db.from('golf_teams').delete().eq('id', teamId);
+                if (res.error) throw res.error;
+                appState.teams = appState.teams.filter(t => t.id !== teamId);
+                renderAll();
+                return true;
+            } catch (error) {
+                console.error('Error deleting team:', error);
+                return false;
+            }
+        }
+
+        async function addRound(name, courseId, teeName) {
+            try {
+                const res = await db.from('golf_rounds').insert([
+                    { name, course_id: parseInt(courseId), tee_name: teeName }
+                ]).select();
+
+                if (res.error) throw res.error;
+                appState.rounds = [...appState.rounds, ...res.data];
+                renderAll();
+                return true;
+            } catch (error) {
+                console.error('Error adding round:', error);
+                return false;
+            }
+        }
+
+        async function deleteRound(roundId) {
+            try {
+                const res = await db.from('golf_rounds').delete().eq('id', roundId);
+                if (res.error) throw res.error;
+                appState.rounds = appState.rounds.filter(r => r.id !== roundId);
+                renderAll();
+                return true;
+            } catch (error) {
+                console.error('Error deleting round:', error);
+                return false;
+            }
+        }
+
+        async function saveScore(playerId, roundId, hole, score) {
+            try {
+                const res = await db.from('golf_scores').upsert([
+                    { player_id: playerId, round_id: roundId, hole: hole, score: parseInt(score) }
+                ], { onConflict: 'player_id,round_id,hole' }).select();
+
+                if (res.error) throw res.error;
+                appState.scores = appState.scores.filter(s => !(s.player_id === playerId && s.round_id === roundId && s.hole === hole));
+                appState.scores = [...appState.scores, ...res.data];
+                return true;
+            } catch (error) {
+                console.error('Error saving score:', error);
+                return false;
+            }
+        }
+
+        // ============================================================================
+        // LEADERBOARD CALCULATIONS
+        // ============================================================================
+
+        function getPlayerScoresForRound(playerId, roundId) {
+            return appState.scores.filter(s => s.player_id === playerId && s.round_id === roundId);
+        }
+
+        function calculatePlayerRoundStats(player, round, roundScores) {
+            const courseData = COURSES_DATA[round.course_id];
+            if (!courseData) return null;
+
+            const tee = courseData.tees[round.tee_name];
+            if (!tee) return null;
+
+            const courseHcp = calculateCourseHandicap(player.handicap, tee.slope, tee.rating, courseData.par);
+
+            let totalGross = 0;
+            let totalNet = 0;
+            let holesPlayed = 0;
+
+            for (const hole of courseData.holes) {
+                const scoreRecord = roundScores.find(s => s.hole === hole.number);
+                if (scoreRecord && scoreRecord.score) {
+                    const gross = scoreRecord.score;
+                    const strokesReceived = getStrokesReceivedOnHole(hole.hcp, courseHcp);
+                    const net = gross - strokesReceived;
+                    totalGross += gross;
+                    totalNet += net;
+                    holesPlayed++;
+                }
+            }
+
+            return {
+                grossScore: holesPlayed > 0 ? totalGross : null,
+                netScore: holesPlayed > 0 ? totalNet : null,
+                holesPlayed: holesPlayed,
+                courseHcp: courseHcp,
+                toPar: holesPlayed > 0 ? totalGross - (courseData.par * holesPlayed / 18) : null
+            };
+        }
+
+        function buildLeaderboard(roundId, scoring) {
+            const leaderboardRound = roundId ? appState.rounds.find(r => r.id === roundId) : null;
+            const scoreKey = scoring === 'net' ? 'netScore' : 'grossScore';
+
+            const leaderboardData = appState.players.map(player => {
+                let totalGross = 0, totalNet = 0, totalToPar = 0, totalPar = 0;
+                let playerRounds = 0;
+                let lastHolesPlayed = 0;
+
+                if (leaderboardRound) {
+                    // Single round
+                    const roundScores = getPlayerScoresForRound(player.id, leaderboardRound.id);
+                    const stats = calculatePlayerRoundStats(player, leaderboardRound, roundScores);
+                    if (stats && stats.grossScore !== null) {
+                        return {
+                            id: player.id,
+                            name: player.name,
+                            teamId: player.team_id,
+                            grossScore: stats.grossScore,
+                            netScore: stats.netScore,
+                            toPar: getToPar(stats.grossScore, COURSES_DATA[leaderboardRound.course_id].par * stats.holesPlayed / 18),
+                            holesPlayed: stats.holesPlayed,
+                            score: scoring === 'net' ? stats.netScore : stats.grossScore
+                        };
+                    }
+                } else {
+                    // Overall
+                    for (const round of appState.rounds) {
+                        const roundScores = getPlayerScoresForRound(player.id, round.id);
+                        const stats = calculatePlayerRoundStats(player, round, roundScores);
+                        if (stats && stats.grossScore !== null) {
+                            totalGross += stats.grossScore;
+                            totalNet += stats.netScore;
+                            totalPar += COURSES_DATA[round.course_id].par * stats.holesPlayed / 18;
+                            lastHolesPlayed = stats.holesPlayed;
+                            playerRounds++;
+                        }
+                    }
+
+                    if (playerRounds > 0) {
+                        const totalToPar = getToPar(totalGross, totalPar);
+                        return {
+                            id: player.id,
+                            name: player.name,
+                            teamId: player.team_id,
+                            grossScore: totalGross,
+                            netScore: totalNet,
+                            toPar: totalToPar,
+                            holesPlayed: lastHolesPlayed,
+                            score: scoring === 'net' ? totalNet : totalGross
+                        };
+                    }
+                }
+
+                return null;
+            }).filter(p => p !== null);
+
+            leaderboardData.sort((a, b) => a.score - b.score);
+            leaderboardData.forEach((p, idx) => p.position = idx + 1);
+
+            return leaderboardData;
+        }
+
+        // ============================================================================
+        // SKINS CALCULATIONS
+        // ============================================================================
+
+        function calculateSkins(roundId, scoring) {
+            const round = appState.rounds.find(r => r.id === roundId);
+            if (!round) return { skins: {}, summary: {} };
+
+            const courseData = COURSES_DATA[round.course_id];
+            const skins = {};
+            const summary = {};
+
+            for (const hole of courseData.holes) {
+                let bestScore = Infinity;
+                const holeScores = {};
+
+                for (const player of appState.players) {
+                    const roundScores = getPlayerScoresForRound(player.id, round.id);
+                    const scoreRecord = roundScores.find(s => s.hole === hole.number);
+
+                    if (scoreRecord && scoreRecord.score) {
+                        const tee = courseData.tees[round.tee_name];
+                        const courseHcp = calculateCourseHandicap(player.handicap, tee.slope, tee.rating, courseData.par);
+                        const strokesReceived = getStrokesReceivedOnHole(hole.hcp, courseHcp);
+
+                        const score = scoring === 'net' ? scoreRecord.score - strokesReceived : scoreRecord.score;
+                        holeScores[player.id] = { score, name: player.name };
+                        if (score < bestScore) bestScore = score;
+                    }
+                }
+
+                const winners = Object.entries(holeScores).filter(([_, data]) => data.score === bestScore);
+
+                if (winners.length === 1) {
+                    const winnerId = parseInt(winners[0][0]);
+                    skins[hole.number] = {
+                        status: 'won',
+                        winner: winners[0][1].name,
+                        winnerId: winnerId
+                    };
+                    summary[winnerId] = (summary[winnerId] || 0) + 1;
+                } else {
+                    skins[hole.number] = {
+                        status: winners.length > 1 ? 'push' : 'carry',
+                        message: winners.length > 1 ? 'Push' : 'Carry'
+                    };
+                }
+            }
+
+            return { skins, summary };
+        }
+
+        // ============================================================================
+        // TEAM CALCULATIONS
+        // ============================================================================
+
+        function calculateTeamStandings() {
+            const standings = appState.teams.map(team => {
+                const teamPlayers = appState.players.filter(p => p.team_id === team.id);
+                let totalNet = 0;
+                let playerCount = 0;
+
+                for (const player of teamPlayers) {
+                    for (const round of appState.rounds) {
+                        const roundScores = getPlayerScoresForRound(player.id, round.id);
+                        const stats = calculatePlayerRoundStats(player, round, roundScores);
+                        if (stats && stats.netScore !== null) {
+                            totalNet += stats.netScore;
+                            playerCount++;
+                        }
+                    }
+                }
+
+                return {
+                    id: team.id,
+                    name: team.name,
+                    score: totalNet,
+                    playerCount: playerCount,
+                    members: teamPlayers
+                };
+            });
+
+            standings.sort((a, b) => a.score - b.score);
+            return standings;
+        }
+
+        // ============================================================================
+        // RENDERING FUNCTIONS
+        // ============================================================================
+
+        function renderLeaderboard() {
+            const container = document.getElementById('leaderboardContent');
+            const roundTabsContainer = document.getElementById('leaderboardRoundTabs');
+
+            // Round tabs
+            roundTabsContainer.innerHTML = '';
+            const overallTab = document.createElement('button');
+            overallTab.className = `round-tab ${appState.leaderboardRound === 'overall' ? 'active' : ''}`;
+            overallTab.textContent = 'Overall';
+            overallTab.onclick = () => {
+                appState.leaderboardRound = 'overall';
+                renderLeaderboard();
+            };
+            roundTabsContainer.appendChild(overallTab);
+
+            for (const round of appState.rounds) {
+                const tab = document.createElement('button');
+                tab.className = `round-tab ${appState.leaderboardRound === round.id ? 'active' : ''}`;
+                tab.textContent = round.name;
+                tab.onclick = () => {
+                    appState.leaderboardRound = round.id;
+                    renderLeaderboard();
+                };
+                roundTabsContainer.appendChild(tab);
+            }
+
+            // Leaderboard
+            const leaderboard = buildLeaderboard(appState.leaderboardRound === 'overall' ? null : appState.leaderboardRound, appState.leaderboardScoring);
+
+            if (leaderboard.length === 0) {
+                container.innerHTML = '<div class="empty-state">No scores yet. Add players and rounds in Setup.</div>';
+                return;
+            }
+
+            let html = '<table class="leaderboard-table"><thead><tr><th>Pos</th><th>Player</th><th>Score</th><th>To Par</th><th>Thru</th></tr></thead><tbody>';
+
+            for (const player of leaderboard) {
+                const team = appState.teams.find(t => t.id === player.teamId);
+                const teamBadge = team ? `<span class="team-badge">${team.name}</span>` : '';
+
+                html += `<tr>
+                    <td><span class="position">${player.position}</span></td>
+                    <td><div class="player-row"><span class="player-name">${player.name}</span>${teamBadge}</div></td>
+                    <td><span class="score-badge ${player.score > 0 ? 'positive' : player.score < 0 ? 'negative' : ''}">${player.score}</span></td>
+                    <td>${player.toPar}</td>
+                    <td><span class="thru-indicator">${player.holesPlayed}</span></td>
+                </tr>`;
+            }
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function renderScorecard() {
+            const playerSelect = document.getElementById('scorecardPlayer');
+            const roundSelect = document.getElementById('scorecardRound');
+            const container = document.getElementById('scorecardContent');
+
+            playerSelect.innerHTML = '<option value="">-- Select Player --</option>';
+            for (const player of appState.players) {
+                const option = document.createElement('option');
+                option.value = player.id;
+                option.textContent = player.name;
+                playerSelect.appendChild(option);
+            }
+
+            roundSelect.innerHTML = '<option value="">-- Select Round --</option>';
+            for (const round of appState.rounds) {
+                const option = document.createElement('option');
+                option.value = round.id;
+                option.textContent = round.name;
+                roundSelect.appendChild(option);
+            }
+
+            if (!appState.selectedPlayer || !appState.selectedRound) {
+                container.innerHTML = '<div class="empty-state">Select a player and round to view/edit scorecard.</div>';
+                return;
+            }
+
+            const player = appState.players.find(p => p.id === parseInt(appState.selectedPlayer));
+            const round = appState.rounds.find(r => r.id === parseInt(appState.selectedRound));
+            const courseData = COURSES_DATA[round.course_id];
+
+            if (!player || !round || !courseData) {
+                container.innerHTML = '<div class="empty-state">Invalid selection.</div>';
+                return;
+            }
+
+            const tee = courseData.tees[round.tee_name];
+            const courseHcp = calculateCourseHandicap(player.handicap, tee.slope, tee.rating, courseData.par);
+            const roundScores = getPlayerScoresForRound(player.id, round.id);
+
+            document.getElementById('courseHcpDisplay').textContent = courseHcp;
+            document.getElementById('strokesReceivedDisplay').textContent = Math.round(courseHcp / 18 * 18);
+
+            let html = '';
+
+            // Front 9
+            html += '<div class="nine-holes"><h4>Front 9</h4><div class="hole-grid">';
+            for (let i = 0; i < 9; i++) {
+                const hole = courseData.holes[i];
+                const scoreRecord = roundScores.find(s => s.hole === hole.number);
+                const score = scoreRecord ? scoreRecord.score : '';
+                const strokesReceived = getStrokesReceivedOnHole(hole.hcp, courseHcp);
+                const scoreClass = getScoreClass(score, hole.par, score ? score - strokesReceived : undefined);
+
+                html += `<div class="hole-item">
+                    <div class="hole-label">Hole ${hole.number}</div>
+                    <div class="hole-par">Par ${hole.par}</div>
+                    <input type="number" class="hole-input ${scoreClass}" min="1" max="20" value="${score}" data-player-id="${player.id}" data-round-id="${round.id}" data-hole="${hole.number}" data-par="${hole.par}">
+                </div>`;
+            }
+            html += '</div></div>';
+
+            // Back 9
+            html += '<div class="nine-holes"><h4>Back 9</h4><div class="hole-grid">';
+            for (let i = 9; i < 18; i++) {
+                const hole = courseData.holes[i];
+                const scoreRecord = roundScores.find(s => s.hole === hole.number);
+                const score = scoreRecord ? scoreRecord.score : '';
+                const strokesReceived = getStrokesReceivedOnHole(hole.hcp, courseHcp);
+                const scoreClass = getScoreClass(score, hole.par, score ? score - strokesReceived : undefined);
+
+                html += `<div class="hole-item">
+                    <div class="hole-label">Hole ${hole.number}</div>
+                    <div class="hole-par">Par ${hole.par}</div>
+                    <input type="number" class="hole-input ${scoreClass}" min="1" max="20" value="${score}" data-player-id="${player.id}" data-round-id="${round.id}" data-hole="${hole.number}" data-par="${hole.par}">
+                </div>`;
+            }
+            html += '</div></div>';
+
+            container.innerHTML = html;
+
+            // Attach event listeners
+            document.querySelectorAll('.hole-input').forEach(input => {
+                input.addEventListener('change', handleScoreInputChange);
+                input.addEventListener('keydown', handleScoreInputKeydown);
+            });
+        }
+
+        function handleScoreInputChange(e) {
+            const playerId = parseInt(e.target.dataset.playerId);
+            const roundId = parseInt(e.target.dataset.roundId);
+            const hole = parseInt(e.target.dataset.hole);
+            const score = e.target.value;
+
+            if (score) {
+                saveScore(playerId, roundId, hole, score).then(() => {
+                    renderScorecard();
+                    renderLeaderboard();
+                    renderSkins();
+                });
+            }
+        }
+
+        function handleScoreInputKeydown(e) {
+            if (e.key === 'Enter') {
+                const inputs = Array.from(document.querySelectorAll('.hole-input'));
+                const currentIndex = inputs.indexOf(e.target);
+                if (currentIndex < inputs.length - 1) {
+                    inputs[currentIndex + 1].focus();
+                }
+            }
+        }
+
+        function renderSkins() {
+            const container = document.getElementById('skinsContent');
+            const roundTabsContainer = document.getElementById('skinsRoundTabs');
+
+            if (appState.rounds.length === 0) {
+                container.innerHTML = '<div class="empty-state">No rounds available.</div>';
+                roundTabsContainer.innerHTML = '';
+                return;
+            }
+
+            // Set first round as default
+            if (!appState.skinsRound && appState.rounds.length > 0) {
+                appState.skinsRound = appState.rounds[0].id;
+            }
+
+            roundTabsContainer.innerHTML = '';
+            for (const round of appState.rounds) {
+                const tab = document.createElement('button');
+                tab.className = `round-tab ${appState.skinsRound === round.id ? 'active' : ''}`;
+                tab.textContent = round.name;
+                tab.onclick = () => {
+                    appState.skinsRound = round.id;
+                    renderSkins();
+                };
+                roundTabsContainer.appendChild(tab);
+            }
+
+            if (!appState.skinsRound) {
+                container.innerHTML = '<div class="empty-state">Select a round.</div>';
+                return;
+            }
+
+            const { skins, summary } = calculateSkins(appState.skinsRound, appState.skinsScoring);
+
+            if (Object.keys(skins).length === 0) {
+                container.innerHTML = '<div class="empty-state">No skins data available.</div>';
+                return;
+            }
+
+            let html = '<div class="skins-grid">';
+            for (const [hole, data] of Object.entries(skins)) {
+                const holeNum = parseInt(hole);
+                let content = '';
+                if (data.status === 'won') {
+                    content = `<div class="skin-winner">${data.winner} wins</div>`;
+                } else if (data.status === 'push') {
+                    content = `<div class="skin-winner push">Push</div>`;
+                } else {
+                    content = `<div class="skin-winner carry">Carry</div>`;
+                }
+
+                html += `<div class="skin-hole">
+                    <div class="skin-hole-number">Hole ${holeNum}</div>
+                    ${content}
+                </div>`;
+            }
+            html += '</div>';
+
+            if (Object.keys(summary).length > 0) {
+                html += '<h3>Skins Summary</h3><div class="skins-grid">';
+                const sortedSummary = Object.entries(summary)
+                    .map(([playerId, count]) => {
+                        const player = appState.players.find(p => p.id === parseInt(playerId));
+                        return { name: player ? player.name : 'Unknown', count };
+                    })
+                    .sort((a, b) => b.count - a.count);
+
+                for (const { name, count } of sortedSummary) {
+                    html += `<div class="skin-hole">
+                        <div class="skin-hole-number">${name}</div>
+                        <div class="skin-winner">${count} skins</div>
+                    </div>`;
+                }
+                html += '</div>';
+            }
+
+            container.innerHTML = html;
+        }
+
+        function renderTeams() {
+            const container = document.getElementById('teamsContent');
+
+            const standings = calculateTeamStandings();
+
+            if (standings.length === 0) {
+                container.innerHTML = '<div class="empty-state">No teams yet. Create teams in Setup.</div>';
+                return;
+            }
+
+            let html = '<div class="teams-grid">';
+            for (const team of standings) {
+                html += `<div class="team-card">
+                    <div class="team-name">${team.name}</div>
+                    <div class="team-score">Score: <span style="color: var(--accent-gold);">${team.score}</span></div>
+                    <div class="team-members">
+                        <div style="color: var(--text-light); opacity: 0.7; font-size: 11px; margin-bottom: 8px;">Members:</div>`;
+
+                for (const player of team.members) {
+                    html += `<div class="member-item">• ${player.name}</div>`;
+                }
+
+                html += `</div></div>`;
+            }
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+
+        function renderCourses() {
+            const container = document.getElementById('coursesContent');
+
+            let html = '<div class="course-grid">';
+
+            for (const [courseId, course] of Object.entries(COURSES_DATA)) {
+                html += `<div class="course-card">
+                    <div class="course-header">
+                        <div class="course-name">${course.name}</div>
+                        <div class="course-location">${course.location}</div>
+                    </div>
+                    <div class="course-specs">
+                        <div class="spec-item">
+                            <div class="spec-label">Par</div>
+                            <div class="spec-value">${course.par}</div>
+                        </div>`;
+
+                // Show primary tee
+                const primaryTeeName = Object.keys(course.tees)[0];
+                const primaryTee = course.tees[primaryTeeName];
+                html += `<div class="spec-item">
+                            <div class="spec-label">${primaryTeeName} Tee</div>
+                            <div class="spec-value">${primaryTee.yards}y</div>
+                        </div>
+                        <div class="spec-item">
+                            <div class="spec-label">Rating</div>
+                            <div class="spec-value">${primaryTee.rating}</div>
+                        </div>
+                        <div class="spec-item">
+                            <div class="spec-label">Slope</div>
+                            <div class="spec-value">${primaryTee.slope}</div>
+                        </div>
+                    </div>`;
+
+                // All tee boxes
+                for (const [teeName, teeData] of Object.entries(course.tees)) {
+                    html += `<div class="tee-box">
+                        <div class="tee-name">${teeName} Tee</div>
+                        <div class="tee-specs">
+                            <div class="tee-spec">
+                                <label>Yards</label>
+                                <span>${teeData.yards}</span>
+                            </div>
+                            <div class="tee-spec">
+                                <label>Rating</label>
+                                <span>${teeData.rating}</span>
+                            </div>
+                            <div class="tee-spec">
+                                <label>Slope</label>
+                                <span>${teeData.slope}</span>
+                            </div>
+                        </div>
+                        <table class="holes-table">
+                            <thead><tr><th>H</th><th>P</th><th>Y</th><th>HC</th><th>H</th><th>P</th><th>Y</th><th>HC</th></tr></thead>
+                            <tbody>`;
+
+                    const holesPerRow = 9;
+                    for (let i = 0; i < course.holes.length; i += holesPerRow) {
+                        html += '<tr>';
+                        for (let j = i; j < i + holesPerRow && j < course.holes.length; j++) {
+                            const hole = course.holes[j];
+                            if (j === 9) {
+                                html += '</tr><tr>';
+                            }
+                            html += `<td>${hole.number}</td><td>${hole.par}</td><td>${hole.yards}</td><td>${hole.hcp}</td>`;
+                        }
+                        html += '</tr>';
+                    }
+
+                    html += '</tbody></table></div>';
+                }
+
+                html += '</div>';
+            }
+
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function renderSetup() {
+            const playersList = document.getElementById('playersList');
+            const teamsList = document.getElementById('teamsList');
+            const roundsList = document.getElementById('roundsList');
+            const playerTeamSelect = document.getElementById('playerTeam');
+            const roundCourseSelect = document.getElementById('roundCourse');
+            const roundTeeSelect = document.getElementById('roundTee');
+
+            // Teams dropdown
+            playerTeamSelect.innerHTML = '<option value="">-- No Team --</option>';
+            for (const team of appState.teams) {
+                const option = document.createElement('option');
+                option.value = team.id;
+                option.textContent = team.name;
+                playerTeamSelect.appendChild(option);
+            }
+
+            // Course dropdown
+            roundCourseSelect.innerHTML = '<option value="">-- Select Course --</option>';
+            for (const [courseId, course] of Object.entries(COURSES_DATA)) {
+                const option = document.createElement('option');
+                option.value = courseId;
+                option.textContent = course.name;
+                roundCourseSelect.appendChild(option);
+            }
+
+            // Players list
+            playersList.innerHTML = '';
+            for (const player of appState.players) {
+                const team = appState.teams.find(t => t.id === player.team_id);
+                const teamName = team ? team.name : 'No Team';
+
+                const item = document.createElement('div');
+                item.className = 'player-item';
+                item.innerHTML = `<div class="player-info">
+                    <div class="player-item-name">${player.name}</div>
+                    <div class="player-item-hcp">HCP ${player.handicap} | ${teamName}</div>
+                </div>
+                <button class="danger" onclick="deletePlayer(${player.id})">Delete</button>`;
+                playersList.appendChild(item);
+            }
+
+            if (appState.players.length === 0) {
+                playersList.innerHTML = '<div class="empty-state">No players added yet.</div>';
+            }
+
+            // Teams list
+            teamsList.innerHTML = '';
+            for (const team of appState.teams) {
+                const item = document.createElement('div');
+                item.className = 'round-item';
+                item.innerHTML = `<div class="round-info">
+                    <div class="round-item-name">${team.name}</div>
+                </div>
+                <button class="danger" onclick="deleteTeam(${team.id})">Delete</button>`;
+                teamsList.appendChild(item);
+            }
+
+            if (appState.teams.length === 0) {
+                teamsList.innerHTML = '<div class="empty-state">No teams added yet.</div>';
+            }
+
+            // Rounds list
+            roundsList.innerHTML = '';
+            for (const round of appState.rounds) {
+                const course = COURSES_DATA[round.course_id];
+                const courseName = course ? course.name : 'Unknown';
+
+                const item = document.createElement('div');
+                item.className = 'round-item';
+                item.innerHTML = `<div class="round-info">
+                    <div class="round-item-name">${round.name}</div>
+                    <div class="round-item-course">${courseName} (${round.tee_name})</div>
+                </div>
+                <button class="danger" onclick="deleteRound(${round.id})">Delete</button>`;
+                roundsList.appendChild(item);
+            }
+
+            if (appState.rounds.length === 0) {
+                roundsList.innerHTML = '<div class="empty-state">No rounds added yet.</div>';
+            }
+
+            // Share URL
+            const shareUrl = window.location.href.split('?')[0];
+            document.getElementById('shareUrl').value = shareUrl;
+        }
+
+        function renderAll() {
+            renderLeaderboard();
+            renderScorecard();
+            renderSkins();
+            renderTeams();
+            renderCourses();
+            renderSetup();
+        }
+
+        // ============================================================================
+        // EVENT LISTENERS
+        // ============================================================================
+
+        document.querySelectorAll('.tab-button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                btn.classList.add('active');
+                const tabId = btn.dataset.tab;
+                document.getElementById(tabId).classList.add('active');
+                appState.currentTab = tabId;
+            });
+        });
+
+        document.querySelectorAll('[data-scoring]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('[data-scoring]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                appState.leaderboardScoring = btn.dataset.scoring;
+                renderLeaderboard();
+            });
+        });
+
+        document.querySelectorAll('[data-skins-scoring]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('[data-skins-scoring]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                appState.skinsScoring = btn.dataset.skinsScoring;
+                renderSkins();
+            });
+        });
+
+        document.getElementById('scorecardPlayer').addEventListener('change', (e) => {
+            appState.selectedPlayer = e.target.value;
+            renderScorecard();
+        });
+
+        document.getElementById('scorecardRound').addEventListener('change', (e) => {
+            appState.selectedRound = e.target.value;
+            renderScorecard();
+        });
+
+        document.querySelector('[data-tab="setup"] .form-group:nth-of-type(1) button').addEventListener('click', () => {
+            const name = document.getElementById('playerName').value;
+            const handicap = document.getElementById('playerHandicap').value;
+            const teamId = document.getElementById('playerTeam').value;
+
+            if (name && handicap) {
+                addPlayer(name, handicap, teamId ? parseInt(teamId) : null).then(() => {
+                    document.getElementById('playerName').value = '';
+                    document.getElementById('playerHandicap').value = '';
+                    document.getElementById('playerTeam').value = '';
+                });
+            }
+        });
+
+        document.getElementById('addTeamBtn').addEventListener('click', () => {
+            const name = document.getElementById('teamName').value;
+            if (name) {
+                addTeam(name).then(() => {
+                    document.getElementById('teamName').value = '';
+                });
+            }
+        });
+
+        document.getElementById('addRoundBtn').addEventListener('click', () => {
+            const name = document.getElementById('roundName').value;
+            const courseId = document.getElementById('roundCourse').value;
+            const teeName = document.getElementById('roundTee').value;
+
+            if (name && courseId && teeName) {
+                addRound(name, courseId, teeName).then(() => {
+                    document.getElementById('roundName').value = '';
+                    document.getElementById('roundCourse').value = '';
+                    document.getElementById('roundTee').value = '';
+                });
+            }
+        });
+
+        document.getElementById('roundCourse').addEventListener('change', (e) => {
+            const courseId = e.target.value;
+            const teeSelect = document.getElementById('roundTee');
+            teeSelect.innerHTML = '<option value="">-- Select Tee --</option>';
+
+            if (courseId) {
+                const course = COURSES_DATA[courseId];
+                for (const teeName of Object.keys(course.tees)) {
+                    const option = document.createElement('option');
+                    option.value = teeName;
+                    option.textContent = teeName;
+                    teeSelect.appendChild(option);
+                }
+            }
+        });
+
+        document.getElementById('copyShareBtn').addEventListener('click', () => {
+            const shareUrl = document.getElementById('shareUrl');
+            shareUrl.select();
+            document.execCommand('copy');
+
+            const btn = document.getElementById('copyShareBtn');
+            const originalText = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 2000);
+        });
+
+        // ============================================================================
+        // SUPABASE REALTIME SUBSCRIPTIONS
+        // ============================================================================
+
+        function setupRealtimeSubscriptions() {
+            const channel = db.channel('golf_updates').on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'golf_players' },
+                () => loadAllData()
+            ).on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'golf_teams' },
+                () => loadAllData()
+            ).on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'golf_rounds' },
+                () => loadAllData()
+            ).on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'golf_scores' },
+                () => loadAllData()
+            ).subscribe();
+        }
+
+        // ============================================================================
+        // INITIALIZATION
+        // ============================================================================
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadAllData();
+            setupRealtimeSubscriptions();
+        });
+
+        // Make deletePlayer and deleteTeam globally available
+        window.deletePlayer = deletePlayer;
+        window.deleteTeam = deleteTeam;
+        window.deleteRound = deleteRound;
+    </script>
+</body>
+</html>
