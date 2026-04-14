@@ -355,6 +355,19 @@
             margin-bottom: 4px;
         }
 
+        .stroke-indicator {
+            color: #ff6b6b;
+            font-size: 10px;
+            letter-spacing: 1px;
+            line-height: 1;
+        }
+
+        .hole-item.has-strokes {
+            border: 1px solid rgba(255, 107, 107, 0.4);
+            border-radius: 4px;
+            padding: 4px;
+        }
+
         .hole-par {
             font-size: 12px;
             color: var(--accent-gold);
@@ -1622,6 +1635,9 @@
                 option.textContent = player.name;
                 playerSelect.appendChild(option);
             }
+            if (appState.selectedPlayer) {
+                playerSelect.value = appState.selectedPlayer;
+            }
 
             roundSelect.innerHTML = '<option value="">-- Select Round --</option>';
             for (const round of appState.rounds) {
@@ -1629,6 +1645,9 @@
                 option.value = round.id;
                 option.textContent = round.name;
                 roundSelect.appendChild(option);
+            }
+            if (appState.selectedRound) {
+                roundSelect.value = appState.selectedRound;
             }
 
             if (!appState.selectedPlayer || !appState.selectedRound) {
@@ -1663,8 +1682,9 @@
                 const strokesReceived = getStrokesReceivedOnHole(hole.hcp, courseHcp);
                 const scoreClass = getScoreClass(score, hole.par, score ? score - strokesReceived : undefined);
 
-                html += `<div class="hole-item">
-                    <div class="hole-label">Hole ${hole.number}</div>
+                const strokeDots = strokesReceived > 0 ? `<div class="stroke-indicator">${'●'.repeat(strokesReceived)}</div>` : '';
+                html += `<div class="hole-item ${strokesReceived > 0 ? 'has-strokes' : ''}">
+                    <div class="hole-label">Hole ${hole.number}${strokeDots}</div>
                     <div class="hole-par">Par ${hole.par}</div>
                     <input type="number" class="hole-input ${scoreClass}" min="1" max="20" value="${score}" data-player-id="${player.id}" data-round-id="${round.id}" data-hole="${hole.number}" data-par="${hole.par}">
                 </div>`;
@@ -1680,8 +1700,9 @@
                 const strokesReceived = getStrokesReceivedOnHole(hole.hcp, courseHcp);
                 const scoreClass = getScoreClass(score, hole.par, score ? score - strokesReceived : undefined);
 
-                html += `<div class="hole-item">
-                    <div class="hole-label">Hole ${hole.number}</div>
+                const strokeDotsBack = strokesReceived > 0 ? `<div class="stroke-indicator">${'●'.repeat(strokesReceived)}</div>` : '';
+                html += `<div class="hole-item ${strokesReceived > 0 ? 'has-strokes' : ''}">
+                    <div class="hole-label">Hole ${hole.number}${strokeDotsBack}</div>
                     <div class="hole-par">Par ${hole.par}</div>
                     <input type="number" class="hole-input ${scoreClass}" min="1" max="20" value="${score}" data-player-id="${player.id}" data-round-id="${round.id}" data-hole="${hole.number}" data-par="${hole.par}">
                 </div>`;
@@ -2009,13 +2030,24 @@
         // EVENT LISTENERS
         // ============================================================================
 
+        let setupUnlocked = false;
         document.querySelectorAll('.tab-button').forEach(btn => {
             btn.addEventListener('click', () => {
+                const tabId = btn.dataset.tab;
+
+                if (tabId === 'setup' && !setupUnlocked) {
+                    const pw = prompt('Enter admin password to access Setup:');
+                    if (pw !== 'hurricane') {
+                        alert('Incorrect password.');
+                        return;
+                    }
+                    setupUnlocked = true;
+                }
+
                 document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
                 btn.classList.add('active');
-                const tabId = btn.dataset.tab;
                 document.getElementById(tabId).classList.add('active');
                 appState.currentTab = tabId;
             });
