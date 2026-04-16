@@ -1074,7 +1074,7 @@
                 <div class="setup-section">
                     <h3>Team Randomizer</h3>
                     <div style="color: var(--text-light); opacity: 0.7; font-size: 12px; margin-bottom: 12px;">
-                        Randomly assign players to 3 teams for each round. You can rename teams and swap players after drawing.
+                        Randomly assign players to teams of 3 for each round. Best 3 net scores count for team scoring. You can rename teams and swap players after drawing.
                     </div>
                     <div id="teamRandomizerContent"></div>
                 </div>
@@ -1452,26 +1452,27 @@
                 // Delete existing assignments for this round
                 await db.from('round_team_assignments').delete().eq('round_id', roundId);
 
-                // Make sure we have exactly 3 teams
-                if (appState.teams.length < 3) {
-                    const needed = 3 - appState.teams.length;
-                    const defaultNames = ['Team 1', 'Team 2', 'Team 3'];
-                    for (let i = appState.teams.length; i < 3; i++) {
-                        const res = await db.from('golf_teams').insert([{ name: defaultNames[i] }]).select();
-                        if (res.error) throw res.error;
-                        appState.teams = [...appState.teams, ...res.data];
-                    }
+                // Calculate how many teams of 3 we need
+                const numPlayers = appState.players.length;
+                const numTeams = Math.ceil(numPlayers / 3);
+
+                // Ensure we have enough teams in the database
+                while (appState.teams.length < numTeams) {
+                    const teamNum = appState.teams.length + 1;
+                    const res = await db.from('golf_teams').insert([{ name: `Team ${teamNum}` }]).select();
+                    if (res.error) throw res.error;
+                    appState.teams = [...appState.teams, ...res.data];
                 }
 
-                const teamIds = appState.teams.slice(0, 3).map(t => t.id);
+                const teamIds = appState.teams.slice(0, numTeams).map(t => t.id);
 
                 // Shuffle players
                 const shuffled = [...appState.players].sort(() => Math.random() - 0.5);
 
-                // Distribute evenly across 3 teams
+                // Distribute into teams of 3 (last team may have 1-2 extras or fewer)
                 const assignments = shuffled.map((player, idx) => ({
                     round_id: roundId,
-                    team_id: teamIds[idx % 3],
+                    team_id: teamIds[Math.floor(idx / 3)],
                     player_id: player.id
                 }));
 
@@ -1691,23 +1692,27 @@
 
             const standings = appState.teams.map(team => {
                 const teamPlayers = getTeamPlayersForRound(team.id, roundId);
-                let totalNet = 0;
-                let playerCount = 0;
+                const netScores = [];
 
                 for (const player of teamPlayers) {
                     const roundScores = getPlayerScoresForRound(player.id, roundId);
                     const stats = calculatePlayerRoundStats(player, round, roundScores);
                     if (stats && stats.netScore !== null) {
-                        totalNet += stats.netScore;
-                        playerCount++;
+                        netScores.push(stats.netScore);
                     }
                 }
+
+                // Use best 3 net scores (or all if fewer than 3)
+                netScores.sort((a, b) => a - b);
+                const best3 = netScores.slice(0, 3);
+                const totalNet = best3.reduce((sum, s) => sum + s, 0);
 
                 return {
                     id: team.id,
                     name: team.name,
                     score: totalNet,
-                    playerCount: playerCount,
+                    scoringCount: best3.length,
+                    playerCount: teamPlayers.length,
                     members: teamPlayers
                 };
             }).filter(t => t.members.length > 0);
@@ -1998,7 +2003,7 @@
                 for (const team of standings) {
                     html += `<div class="team-card">
                         <div class="team-name">${team.name}</div>
-                        <div class="team-score">Net: <span style="color: var(--accent-gold);">${team.score}</span></div>
+                        <div class="team-score">Net: <span style="color: var(--accent-gold);">${team.score}</span> <span style="opacity: 0.5; font-size: 11px;">(best ${team.scoringCount} of ${team.playerCount})</span></div>
                         <div class="team-members">
                             <div style="color: var(--text-light); opacity: 0.7; font-size: 11px; margin-bottom: 8px;">Members:</div>`;
 
@@ -2157,7 +2162,7 @@
         }
 
         window.handleRandomize = async function(roundId) {
-            if (confirm('This will randomly assign all players to 3 teams for this round. Continue?')) {
+            if (confirm('This will randomly assign all players to teams of 3 for this round. Continue?')) {
                 await randomizeTeamsForRound(roundId);
             }
         };
@@ -2281,7 +2286,7 @@
                     const team = appState.teams.find(t => t.id === teamId);
                     if (!team) continue;
                     const teamPlayers = getTeamPlayersForRound(teamId, roundId);
-                    let combinedNet = 0;
+                    const netScores = [];
                     let allComplete = true;
                     const memberNames = [];
                     for (const player of teamPlayers) {
@@ -2289,11 +2294,15 @@
                         if (scores.length === 18) {
                             const stats = calculatePlayerRoundStats(player, round, scores);
                             if (stats && stats.netScore !== null) {
-                                combinedNet += stats.netScore;
+                                netScores.push(stats.netScore);
                                 memberNames.push(player.name);
                             } else { allComplete = false; }
                         } else { allComplete = false; }
                     }
+                    // Use best 3 net scores
+                    netScores.sort((a, b) => a - b);
+                    const best3 = netScores.slice(0, 3);
+                    const combinedNet = best3.reduce((sum, s) => sum + s, 0);
                     if (allComplete && teamPlayers.length > 0) {
                         teamResults.push({ teamName: team.name, combinedNet, members: memberNames });
                     }
@@ -2434,7 +2443,7 @@
             // TEAM LOW SCORE
             html += '<div class="purse-category">';
             html += '<div class="category-header"><h3>Team Low Score (Net)</h3><span class="category-total">$960</span></div>';
-            html += '<div class="category-note">New 4-man teams drawn each morning &bull; best combined net score &bull; winner-take-all</div>';
+            html += '<div class="category-note">New 3-man teams drawn each morning &bull; best 3 net scores count &bull; winner-take-all</div>';
             html += '<div class="format-box"><p>Teams are redrawn every day so you get to play with different people all weekend. Best combined net team score wins the full $320 pot for the day &mdash; $80 per player.</p></div>';
             html += '<div style="margin-top: 12px;">' + buildDayCards('team') + '</div>';
             html += '</div>';
@@ -2467,7 +2476,7 @@
             html += '<div class="rules-section"><h3>Payout Rules</h3>';
             html += '<div class="rule-block"><h4>Scoring Format</h4><p>All payouts are based on <span class="rule-highlight">net scores</span> (gross score minus handicap strokes). Each player\'s course handicap is calculated using the USGA formula based on their handicap index and the course slope/rating for the tees being played that day. Strokes are distributed across holes by hole handicap ranking.</p></div>';
             html += '<div class="rule-block"><h4>Overall Individual Champion</h4><p>The overall champion is determined by the <span class="rule-highlight">lowest cumulative net score across all 3 rounds</span>. First place receives $100 and the trophy. Second place receives $75. Third place receives $50. You must complete all 3 rounds to be eligible for overall tournament payouts.</p></div>';
-            html += '<div class="rule-block"><h4>Team Low Score (Net)</h4><p>New <span class="rule-highlight">4-man teams are drawn randomly each morning</span> before the round. The winning team is determined by the lowest combined net score of all 4 team members. The winning team takes the full <span class="rule-highlight">$320 pot ($80 per player)</span>. Every player is on a team each day, and since teams are redrawn daily, you\'ll compete alongside different partners throughout the weekend.</p></div>';
+            html += '<div class="rule-block"><h4>Team Low Score (Net)</h4><p>New <span class="rule-highlight">3-man teams are drawn randomly each morning</span> before the round. The winning team is determined by the <span class="rule-highlight">best 3 net scores</span> on the team. If a team has more than 3 players, only the 3 lowest net scores count. The winning team takes the full <span class="rule-highlight">$320 pot ($80 per player)</span>. Every player is on a team each day, and since teams are redrawn daily, you\'ll compete alongside different partners throughout the weekend.</p></div>';
             html += '<div class="rule-block"><h4>Individual Low Score (Net)</h4><p>Each day, the player with the <span class="rule-highlight">lowest individual net score</span> for that round wins $80. A player can win the daily low net on multiple days. If a player does not complete all 18 holes, they are not eligible for that day\'s payout.</p></div>';
             html += '<div class="rule-block"><h4>Daily Skins</h4><p>Skins are a <span class="rule-highlight">separate $10/player buy-in each day</span> &mdash; not part of the main purse. A skin is won by having the lowest net score on a hole outright. If two or more players tie for the lowest net score, the skin <span class="rule-highlight">pushes</span> and carries over to the next hole, increasing its value. Any remaining carry at the end of the round goes to the last skin winner. The total pot is divided equally among the number of skins won, then paid to each winner based on how many skins they hold.</p></div>';
             html += '<div class="tiebreaker-note"><p><strong>Individual Tiebreakers:</strong> If there is a tie for any individual payout position, the prize money for the tied positions is combined and split evenly. For example, if two players tie for 2nd place overall, the 2nd and 3rd place prizes ($75 + $50 = $125) are split equally ($62.50 each). For daily low net ties, the $80 is split evenly.</p></div>';
