@@ -1496,13 +1496,16 @@
                     const roundScores = getPlayerScoresForRound(player.id, leaderboardRound.id);
                     const stats = calculatePlayerRoundStats(player, leaderboardRound, roundScores);
                     if (stats && stats.grossScore !== null) {
+                        const parForHolesPlayed = COURSES_DATA[leaderboardRound.course_id].par * stats.holesPlayed / 18;
+                        const toParNum = (scoring === 'net' ? stats.netScore : stats.grossScore) - parForHolesPlayed;
                         return {
                             id: player.id,
                             name: player.name,
                             teamId: player.team_id,
                             grossScore: stats.grossScore,
                             netScore: stats.netScore,
-                            toPar: getToPar(stats.grossScore, COURSES_DATA[leaderboardRound.course_id].par * stats.holesPlayed / 18),
+                            toPar: getToPar(scoring === 'net' ? stats.netScore : stats.grossScore, parForHolesPlayed),
+                            toParNum: toParNum,
                             holesPlayed: stats.holesPlayed,
                             score: scoring === 'net' ? stats.netScore : stats.grossScore
                         };
@@ -1522,14 +1525,16 @@
                     }
 
                     if (playerRounds > 0) {
-                        const totalToPar = getToPar(totalGross, totalPar);
+                        const scoreForToPar = scoring === 'net' ? totalNet : totalGross;
+                        const toParNum = scoreForToPar - totalPar;
                         return {
                             id: player.id,
                             name: player.name,
                             teamId: player.team_id,
                             grossScore: totalGross,
                             netScore: totalNet,
-                            toPar: totalToPar,
+                            toPar: getToPar(scoreForToPar, totalPar),
+                            toParNum: toParNum,
                             holesPlayed: lastHolesPlayed,
                             score: scoring === 'net' ? totalNet : totalGross
                         };
@@ -1539,7 +1544,7 @@
                 return null;
             }).filter(p => p !== null);
 
-            leaderboardData.sort((a, b) => a.score - b.score);
+            leaderboardData.sort((a, b) => a.toParNum - b.toParNum);
             leaderboardData.forEach((p, idx) => p.position = idx + 1);
 
             return leaderboardData;
@@ -1669,7 +1674,7 @@
                 return;
             }
 
-            let html = '<table class="leaderboard-table"><thead><tr><th>Pos</th><th>Player</th><th>Score</th><th>To Par</th><th>Thru</th></tr></thead><tbody>';
+            let html = '<table class="leaderboard-table"><thead><tr><th>Pos</th><th>Player</th><th>To Par</th><th>Score</th><th>Thru</th></tr></thead><tbody>';
 
             for (const player of leaderboard) {
                 const team = appState.teams.find(t => t.id === player.teamId);
@@ -1678,8 +1683,8 @@
                 html += `<tr>
                     <td><span class="position">${player.position}</span></td>
                     <td><div class="player-row"><span class="player-name">${player.name}</span>${teamBadge}</div></td>
-                    <td><span class="score-badge ${player.score > 0 ? 'positive' : player.score < 0 ? 'negative' : ''}">${player.score}</span></td>
-                    <td>${player.toPar}</td>
+                    <td><span class="score-badge ${player.toParNum > 0 ? 'positive' : player.toParNum < 0 ? 'negative' : ''}">${player.toPar}</span></td>
+                    <td>${player.score}</td>
                     <td><span class="thru-indicator">${player.holesPlayed}</span></td>
                 </tr>`;
             }
