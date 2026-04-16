@@ -1779,6 +1779,34 @@
             }
 
             html += '</tbody></table>';
+
+            // Team Standings
+            const roundsToShow = viewingRoundId ? [appState.rounds.find(r => r.id === viewingRoundId)] : appState.rounds;
+            let hasAnyTeams = false;
+
+            for (const round of roundsToShow) {
+                if (!round) continue;
+                const teamStandings = calculateTeamStandingsForRound(round.id);
+                if (teamStandings.length === 0) continue;
+                hasAnyTeams = true;
+
+                html += `<div style="margin-top: 24px;">`;
+                html += `<h3 style="color: var(--accent-gold); font-size: 16px; margin-bottom: 8px;">${viewingRoundId ? 'Team Standings' : round.name + ' — Teams'}</h3>`;
+                html += '<table class="leaderboard-table"><thead><tr><th>Pos</th><th>Team</th><th>Net</th><th>Players</th></tr></thead><tbody>';
+
+                teamStandings.forEach((team, idx) => {
+                    const memberNames = team.members.map(m => m.name).join(', ');
+                    html += `<tr>
+                        <td><span class="position">${idx + 1}</span></td>
+                        <td><span class="player-name">${team.name}</span></td>
+                        <td><span class="score-badge">${team.score}</span> <span style="opacity: 0.5; font-size: 11px;">(best ${team.scoringCount})</span></td>
+                        <td style="font-size: 12px; opacity: 0.8;">${memberNames}</td>
+                    </tr>`;
+                });
+
+                html += '</tbody></table></div>';
+            }
+
             container.innerHTML = html;
         }
 
