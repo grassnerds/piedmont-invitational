@@ -1064,12 +1064,6 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <div>
-                            <label>Team (Optional)</label>
-                            <select id="playerTeam">
-                                <option value="">-- No Team --</option>
-                            </select>
-                        </div>
                         <div style="display: flex; gap: 8px; align-items: flex-end;">
                             <button id="addPlayerBtn" style="flex: 1;">Add Player</button>
                         </div>
@@ -1078,17 +1072,11 @@
                 </div>
 
                 <div class="setup-section">
-                    <h3>Teams</h3>
-                    <div class="form-group">
-                        <div>
-                            <label>Team Name</label>
-                            <input type="text" id="teamName" placeholder="Team Alpha">
-                        </div>
-                        <div style="display: flex; gap: 8px; align-items: flex-end;">
-                            <button style="flex: 1;" id="addTeamBtn">Add Team</button>
-                        </div>
+                    <h3>Team Randomizer</h3>
+                    <div style="color: var(--text-light); opacity: 0.7; font-size: 12px; margin-bottom: 12px;">
+                        Randomly assign players to 3 teams for each round. You can rename teams and swap players after drawing.
                     </div>
-                    <div id="teamsList"></div>
+                    <div id="teamRandomizerContent"></div>
                 </div>
 
                 <div class="setup-section">
@@ -1244,6 +1232,7 @@
             teams: [],
             rounds: [],
             scores: [],
+            roundTeamAssignments: [],
             currentTab: 'leaderboard',
             leaderboardScoring: 'net',
             leaderboardRound: 'overall',
@@ -1312,22 +1301,25 @@
             try {
                 updateConnectionStatus(true);
 
-                const [playersRes, teamsRes, roundsRes, scoresRes] = await Promise.all([
+                const [playersRes, teamsRes, roundsRes, scoresRes, rtaRes] = await Promise.all([
                     db.from('golf_players').select('*'),
                     db.from('golf_teams').select('*'),
                     db.from('golf_rounds').select('*'),
-                    db.from('golf_scores').select('*')
+                    db.from('golf_scores').select('*'),
+                    db.from('round_team_assignments').select('*')
                 ]);
 
                 if (playersRes.error) throw playersRes.error;
                 if (teamsRes.error) throw teamsRes.error;
                 if (roundsRes.error) throw roundsRes.error;
                 if (scoresRes.error) throw scoresRes.error;
+                if (rtaRes.error) throw rtaRes.error;
 
                 appState.players = playersRes.data || [];
                 appState.teams = teamsRes.data || [];
                 appState.rounds = roundsRes.data || [];
                 appState.scores = scoresRes.data || [];
+                appState.roundTeamAssignments = rtaRes.data || [];
 
                 renderAll();
             } catch (error) {
@@ -1436,6 +1428,93 @@
                 return true;
             } catch (error) {
                 console.error('Error saving score:', error);
+                return false;
+            }
+        }
+
+        // ============================================================================
+        // ROUND TEAM ASSIGNMENT HELPERS
+        // ============================================================================
+
+        function getPlayerTeamForRound(playerId, roundId) {
+            const assignment = appState.roundTeamAssignments.find(a => a.player_id === playerId && a.round_id === roundId);
+            if (assignment) return appState.teams.find(t => t.id === assignment.team_id) || null;
+            return null;
+        }
+
+        function getTeamPlayersForRound(teamId, roundId) {
+            const assignments = appState.roundTeamAssignments.filter(a => a.team_id === teamId && a.round_id === roundId);
+            return assignments.map(a => appState.players.find(p => p.id === a.player_id)).filter(Boolean);
+        }
+
+        async function randomizeTeamsForRound(roundId) {
+            try {
+                // Delete existing assignments for this round
+                await db.from('round_team_assignments').delete().eq('round_id', roundId);
+
+                // Make sure we have exactly 3 teams
+                if (appState.teams.length < 3) {
+                    const needed = 3 - appState.teams.length;
+                    const defaultNames = ['Team 1', 'Team 2', 'Team 3'];
+                    for (let i = appState.teams.length; i < 3; i++) {
+                        const res = await db.from('golf_teams').insert([{ name: defaultNames[i] }]).select();
+                        if (res.error) throw res.error;
+                        appState.teams = [...appState.teams, ...res.data];
+                    }
+                }
+
+                const teamIds = appState.teams.slice(0, 3).map(t => t.id);
+
+                // Shuffle players
+                const shuffled = [...appState.players].sort(() => Math.random() - 0.5);
+
+                // Distribute evenly across 3 teams
+                const assignments = shuffled.map((player, idx) => ({
+                    round_id: roundId,
+                    team_id: teamIds[idx % 3],
+                    player_id: player.id
+                }));
+
+                const res = await db.from('round_team_assignments').insert(assignments).select();
+                if (res.error) throw res.error;
+
+                // Update local state
+                appState.roundTeamAssignments = appState.roundTeamAssignments.filter(a => a.round_id !== roundId);
+                appState.roundTeamAssignments = [...appState.roundTeamAssignments, ...res.data];
+                renderAll();
+                return true;
+            } catch (error) {
+                console.error('Error randomizing teams:', error);
+                return false;
+            }
+        }
+
+        async function swapPlayerTeam(playerId, fromRoundId, toTeamId) {
+            try {
+                const existing = appState.roundTeamAssignments.find(a => a.player_id === playerId && a.round_id === fromRoundId);
+                if (!existing) return false;
+
+                const res = await db.from('round_team_assignments').update({ team_id: toTeamId }).eq('id', existing.id).select();
+                if (res.error) throw res.error;
+
+                appState.roundTeamAssignments = appState.roundTeamAssignments.map(a => a.id === existing.id ? res.data[0] : a);
+                renderAll();
+                return true;
+            } catch (error) {
+                console.error('Error swapping player:', error);
+                return false;
+            }
+        }
+
+        async function renameTeam(teamId, newName) {
+            try {
+                const res = await db.from('golf_teams').update({ name: newName }).eq('id', teamId).select();
+                if (res.error) throw res.error;
+                appState.teams = appState.teams.map(t => t.id === teamId ? res.data[0] : t);
+                renderAll();
+                return true;
+            } catch (error) {
+                console.error('Error renaming team:', error);
                 return false;
             }
         }
@@ -1606,20 +1685,21 @@
         // TEAM CALCULATIONS
         // ============================================================================
 
-        function calculateTeamStandings() {
+        function calculateTeamStandingsForRound(roundId) {
+            const round = appState.rounds.find(r => r.id === roundId);
+            if (!round) return [];
+
             const standings = appState.teams.map(team => {
-                const teamPlayers = appState.players.filter(p => p.team_id === team.id);
+                const teamPlayers = getTeamPlayersForRound(team.id, roundId);
                 let totalNet = 0;
                 let playerCount = 0;
 
                 for (const player of teamPlayers) {
-                    for (const round of appState.rounds) {
-                        const roundScores = getPlayerScoresForRound(player.id, round.id);
-                        const stats = calculatePlayerRoundStats(player, round, roundScores);
-                        if (stats && stats.netScore !== null) {
-                            totalNet += stats.netScore;
-                            playerCount++;
-                        }
+                    const roundScores = getPlayerScoresForRound(player.id, roundId);
+                    const stats = calculatePlayerRoundStats(player, round, roundScores);
+                    if (stats && stats.netScore !== null) {
+                        totalNet += stats.netScore;
+                        playerCount++;
                     }
                 }
 
@@ -1630,7 +1710,7 @@
                     playerCount: playerCount,
                     members: teamPlayers
                 };
-            });
+            }).filter(t => t.members.length > 0);
 
             standings.sort((a, b) => a.score - b.score);
             return standings;
@@ -1676,9 +1756,13 @@
 
             let html = '<table class="leaderboard-table"><thead><tr><th>Pos</th><th>Player</th><th>To Par</th><th>Score</th><th>Thru</th></tr></thead><tbody>';
 
+            const viewingRoundId = appState.leaderboardRound !== 'overall' ? appState.leaderboardRound : null;
             for (const player of leaderboard) {
-                const team = appState.teams.find(t => t.id === player.teamId);
-                const teamBadge = team ? `<span class="team-badge">${team.name}</span>` : '';
+                let teamBadge = '';
+                if (viewingRoundId) {
+                    const team = getPlayerTeamForRound(player.id, viewingRoundId);
+                    teamBadge = team ? `<span class="team-badge">${team.name}</span>` : '';
+                }
 
                 html += `<tr>
                     <td><span class="position">${player.position}</span></td>
@@ -1895,28 +1979,37 @@
         function renderTeams() {
             const container = document.getElementById('teamsContent');
 
-            const standings = calculateTeamStandings();
-
-            if (standings.length === 0) {
-                container.innerHTML = '<div class="empty-state">No teams yet. Create teams in Setup.</div>';
+            if (appState.rounds.length === 0) {
+                container.innerHTML = '<div class="empty-state">No rounds yet. Add rounds in Setup.</div>';
                 return;
             }
 
-            let html = '<div class="teams-grid">';
-            for (const team of standings) {
-                html += `<div class="team-card">
-                    <div class="team-name">${team.name}</div>
-                    <div class="team-score">Score: <span style="color: var(--accent-gold);">${team.score}</span></div>
-                    <div class="team-members">
-                        <div style="color: var(--text-light); opacity: 0.7; font-size: 11px; margin-bottom: 8px;">Members:</div>`;
+            let html = '';
+            for (const round of appState.rounds) {
+                const standings = calculateTeamStandingsForRound(round.id);
+                html += `<h3 style="margin: 16px 0 8px; color: var(--accent-gold);">${round.name}</h3>`;
 
-                for (const player of team.members) {
-                    html += `<div class="member-item">• ${player.name}</div>`;
+                if (standings.length === 0) {
+                    html += '<div class="empty-state" style="margin-bottom: 16px;">No teams drawn for this round yet. Draw teams in Setup.</div>';
+                    continue;
                 }
 
-                html += `</div></div>`;
+                html += '<div class="teams-grid">';
+                for (const team of standings) {
+                    html += `<div class="team-card">
+                        <div class="team-name">${team.name}</div>
+                        <div class="team-score">Net: <span style="color: var(--accent-gold);">${team.score}</span></div>
+                        <div class="team-members">
+                            <div style="color: var(--text-light); opacity: 0.7; font-size: 11px; margin-bottom: 8px;">Members:</div>`;
+
+                    for (const player of team.members) {
+                        html += `<div class="member-item">• ${player.name} (HCP ${player.handicap})</div>`;
+                    }
+
+                    html += `</div></div>`;
+                }
+                html += '</div>';
             }
-            html += '</div>';
 
             container.innerHTML = html;
         }
@@ -2000,22 +2093,94 @@
             container.innerHTML = html;
         }
 
+        function renderTeamRandomizer() {
+            const container = document.getElementById('teamRandomizerContent');
+            if (!container) return;
+
+            if (appState.rounds.length === 0) {
+                container.innerHTML = '<div class="empty-state">Add rounds first, then draw teams for each round.</div>';
+                return;
+            }
+
+            if (appState.players.length < 3) {
+                container.innerHTML = '<div class="empty-state">Add at least 3 players to draw teams.</div>';
+                return;
+            }
+
+            let html = '';
+            for (const round of appState.rounds) {
+                const roundAssignments = appState.roundTeamAssignments.filter(a => a.round_id === round.id);
+                const hasTeams = roundAssignments.length > 0;
+
+                html += `<div style="border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; margin-bottom: 16px;">`;
+                html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">`;
+                html += `<strong style="color: var(--accent-gold);">${round.name}</strong>`;
+                html += `<button onclick="handleRandomize(${round.id})" style="font-size: 12px; padding: 6px 14px;">${hasTeams ? 'Re-Draw Teams' : 'Draw Teams'}</button>`;
+                html += `</div>`;
+
+                if (hasTeams) {
+                    const teamIds = [...new Set(roundAssignments.map(a => a.team_id))];
+                    for (const teamId of teamIds) {
+                        const team = appState.teams.find(t => t.id === teamId);
+                        if (!team) continue;
+                        const players = getTeamPlayersForRound(teamId, round.id);
+
+                        html += `<div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px; margin-bottom: 8px;">`;
+                        html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">`;
+                        html += `<span style="font-weight: 600; color: var(--text-light); cursor: pointer;" onclick="handleRenameTeam(${teamId})">${team.name} ✏️</span>`;
+                        html += `<span style="font-size: 11px; opacity: 0.5;">${players.length} players</span>`;
+                        html += `</div>`;
+
+                        for (const player of players) {
+                            const otherTeams = teamIds.filter(tid => tid !== teamId);
+                            html += `<div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 13px;">`;
+                            html += `<span>• ${player.name} <span style="opacity: 0.5;">(HCP ${player.handicap})</span></span>`;
+                            html += `<select onchange="handleSwapPlayer(${player.id}, ${round.id}, this.value)" style="font-size: 11px; padding: 2px 6px; background: var(--bg-card); color: var(--text-light); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px;">`;
+                            html += `<option value="">Move to...</option>`;
+                            for (const otherTid of otherTeams) {
+                                const otherTeam = appState.teams.find(t => t.id === otherTid);
+                                if (otherTeam) html += `<option value="${otherTid}">${otherTeam.name}</option>`;
+                            }
+                            html += `</select></div>`;
+                        }
+
+                        html += `</div>`;
+                    }
+                } else {
+                    html += `<div class="empty-state" style="margin: 0; padding: 8px 0;">No teams drawn yet</div>`;
+                }
+
+                html += `</div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        window.handleRandomize = async function(roundId) {
+            if (confirm('This will randomly assign all players to 3 teams for this round. Continue?')) {
+                await randomizeTeamsForRound(roundId);
+            }
+        };
+
+        window.handleRenameTeam = async function(teamId) {
+            const team = appState.teams.find(t => t.id === teamId);
+            const newName = prompt('Enter new team name:', team ? team.name : '');
+            if (newName && newName.trim()) {
+                await renameTeam(teamId, newName.trim());
+            }
+        };
+
+        window.handleSwapPlayer = async function(playerId, roundId, toTeamId) {
+            if (toTeamId) {
+                await swapPlayerTeam(playerId, roundId, parseInt(toTeamId));
+            }
+        };
+
         function renderSetup() {
             const playersList = document.getElementById('playersList');
-            const teamsList = document.getElementById('teamsList');
             const roundsList = document.getElementById('roundsList');
-            const playerTeamSelect = document.getElementById('playerTeam');
             const roundCourseSelect = document.getElementById('roundCourse');
             const roundTeeSelect = document.getElementById('roundTee');
-
-            // Teams dropdown
-            playerTeamSelect.innerHTML = '<option value="">-- No Team --</option>';
-            for (const team of appState.teams) {
-                const option = document.createElement('option');
-                option.value = team.id;
-                option.textContent = team.name;
-                playerTeamSelect.appendChild(option);
-            }
 
             // Course dropdown
             roundCourseSelect.innerHTML = '<option value="">-- Select Course --</option>';
@@ -2029,14 +2194,11 @@
             // Players list
             playersList.innerHTML = '';
             for (const player of appState.players) {
-                const team = appState.teams.find(t => t.id === player.team_id);
-                const teamName = team ? team.name : 'No Team';
-
                 const item = document.createElement('div');
                 item.className = 'player-item';
                 item.innerHTML = `<div class="player-info">
                     <div class="player-item-name">${player.name}</div>
-                    <div class="player-item-hcp">HCP ${player.handicap} | ${teamName}</div>
+                    <div class="player-item-hcp">HCP ${player.handicap}</div>
                 </div>
                 <button class="danger" onclick="deletePlayer(${player.id})">Delete</button>`;
                 playersList.appendChild(item);
@@ -2046,21 +2208,8 @@
                 playersList.innerHTML = '<div class="empty-state">No players added yet.</div>';
             }
 
-            // Teams list
-            teamsList.innerHTML = '';
-            for (const team of appState.teams) {
-                const item = document.createElement('div');
-                item.className = 'round-item';
-                item.innerHTML = `<div class="round-info">
-                    <div class="round-item-name">${team.name}</div>
-                </div>
-                <button class="danger" onclick="deleteTeam(${team.id})">Delete</button>`;
-                teamsList.appendChild(item);
-            }
-
-            if (appState.teams.length === 0) {
-                teamsList.innerHTML = '<div class="empty-state">No teams added yet.</div>';
-            }
+            // Team Randomizer
+            renderTeamRandomizer();
 
             // Rounds list
             roundsList.innerHTML = '';
@@ -2125,8 +2274,13 @@
                 const round = appState.rounds.find(r => r.id === roundId);
                 if (!round || appState.teams.length === 0) return null;
                 const teamResults = [];
-                for (const team of appState.teams) {
-                    const teamPlayers = appState.players.filter(p => p.team_id === team.id);
+                // Use per-round team assignments
+                const roundAssignments = appState.roundTeamAssignments.filter(a => a.round_id === roundId);
+                const teamIdsInRound = [...new Set(roundAssignments.map(a => a.team_id))];
+                for (const teamId of teamIdsInRound) {
+                    const team = appState.teams.find(t => t.id === teamId);
+                    if (!team) continue;
+                    const teamPlayers = getTeamPlayersForRound(teamId, roundId);
                     let combinedNet = 0;
                     let allComplete = true;
                     const memberNames = [];
@@ -2391,22 +2545,11 @@
         document.getElementById('addPlayerBtn').addEventListener('click', () => {
             const name = document.getElementById('playerName').value;
             const handicap = document.getElementById('playerHandicap').value;
-            const teamId = document.getElementById('playerTeam').value;
 
             if (name && handicap) {
-                addPlayer(name, handicap, teamId ? parseInt(teamId) : null).then(() => {
+                addPlayer(name, handicap, null).then(() => {
                     document.getElementById('playerName').value = '';
                     document.getElementById('playerHandicap').value = '';
-                    document.getElementById('playerTeam').value = '';
-                });
-            }
-        });
-
-        document.getElementById('addTeamBtn').addEventListener('click', () => {
-            const name = document.getElementById('teamName').value;
-            if (name) {
-                addTeam(name).then(() => {
-                    document.getElementById('teamName').value = '';
                 });
             }
         });
@@ -2474,6 +2617,10 @@
             ).on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'golf_scores' },
+                () => loadAllData()
+            ).on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'round_team_assignments' },
                 () => loadAllData()
             ).subscribe();
         }
